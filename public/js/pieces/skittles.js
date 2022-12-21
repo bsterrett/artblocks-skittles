@@ -100,7 +100,7 @@ function transition_value(start, target, percentage) {
 }
 
 color_definition_iter = 1;
-function draw_dots(time) {
+function draw_dots(frame) {
   //ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   for (element in particle_coords_x) {
@@ -116,8 +116,8 @@ function draw_dots(time) {
     if(collision[element] == false) {
       ctx.fillStyle = `hsla(${hue},${saturation}%,${lightness}%,1)`;
       ctx.strokeStyle = `hsla(${hue},${saturation}%,${lightness}%,1)`;
-      if(time > 0.8) {
-        time = t = 0;
+      if(frame > 80) {
+        frame = t = 0;
         color_definition_iter = (color_definition_iter + 1) % color_definitions.length;
       }
     } else {
@@ -140,12 +140,12 @@ var t = 0;
 collisions = true;
 
 function shake_table() {
-  t += .01
-  t = t % 1000
+  t += 1
+  t = t % 100000
 
   draw_dots(t);
 
-  if(t % .8 < .01) {
+  if(t % 80 < 1) {
     //collisions = false;
     update_nonconstants();
   }
@@ -169,8 +169,8 @@ function shake_table() {
           if (Math.pow(x_next - particle_coords_x[j], 2) + Math.pow(y_next - particle_coords_y[j], 2) < Math.pow(Diameter, 2)) {
             // x_next = particle_coords_x[i] + (x_next - particle_coords_x[j]) * 10 * Diameter;
             // y_next = particle_coords_y[i] + (y_next - particle_coords_y[j])  * 10 * Diameter;
-            x_next = L * random();
-            y_next = L * random();
+            x_next = (L * random());
+            y_next = (L * random());
             collision[i] = true;
             break;
           }
@@ -179,8 +179,8 @@ function shake_table() {
     }
 
     if(Math.abs(particle_coords_x[i]) > L || Math.abs(particle_coords_y[i]) > L){
-      x_next = L * random();
-      y_next = L * random();
+      x_next = (L * random());
+      y_next = (L * random());
     }
 
     particle_coords_x[i] = x_next;
@@ -195,21 +195,22 @@ function shake_table() {
 function setup() {
   // window.CP.PenTimer.MAX_TIME_IN_LOOP_WO_EXIT = 5000;
   var DEFAULT_SIZE = 1000;
-  // var WIDTH = window.innerWidth;
-  // var HEIGHT = window.innerHeight;
-  var WIDTH = 800;
-  var HEIGHT = 800;
-  var DIM = Math.min(WIDTH, HEIGHT);
+  var WIDTH = window.innerWidth;
+  var HEIGHT = window.innerHeight;
+  // var WIDTH = 800;
+  // var HEIGHT = 800;
+  var DIM = Math.min(800, Math.min(WIDTH, HEIGHT));
   var SCALE = DIM / DEFAULT_SIZE; /// USE THIS FOR SCALING OBJECTS TO SET SIZE
   // let tokenData = genTokenData(666);
 
-  canvas = createCanvas(800, 800);
-  console.log(canvas);
+  // Canvas Setup
+
+  canvas = createCanvas(DIM, DIM);
   ctx = canvas.drawingContext;
 
-  // Canvas Setup
   // const canvas = document.getElementById("canvas1");
   // const ctx = canvas.getContext("2d");
+
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
   ctx.fillStyle='rgb(25, 25, 25)';
@@ -222,19 +223,21 @@ function setup() {
   n = Math.floor(random(1, 3));
   A = 1;
   B = 1;
-  L = 1000;
+  L = DIM;
   KX = (m * Math.PI) / plate_length;
   KY = (n * Math.PI) / plate_length;
   KXL = KX / L;
   KYL = KY / L;
   w = velocity * Math.sqrt((KX ^ 2) + (KY ^ 2));
 
+  console.log(L);
+
   particle_count = 100;
   Diameter = 1
 
   // Particle coordinates
-  particle_coords_x = Array.from({ length: particle_count }, (_, index) => L * random());
-  particle_coords_y = Array.from({ length: particle_count }, (_, index) => L * random());
+  particle_coords_x = Array.from({ length: particle_count }, (_, index) =>  (L * random()));
+  particle_coords_y = Array.from({ length: particle_count }, (_, index) =>  (L * random()));
   collision = Array.from({ length: particle_count }, (_, index) => false);
   space = L;
   // gradient randomness
