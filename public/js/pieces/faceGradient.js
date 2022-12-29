@@ -67,7 +67,7 @@ function init() {
 
     const radius = 200;
 
-    const geometry1 = new THREE.IcosahedronGeometry( radius, 1 );
+    const geometry1 = new THREE.IcosahedronBufferGeometry( radius, 1 );
 
     console.log(geometry1);
     const count = geometry1.getAttribute("position").count;
