@@ -28,7 +28,8 @@ const gravitational_acceleration = [0, -1, 0];
 init();
 
 function makeNewSkittleColor( paletteIndex ) {
-    return new THREE.Color( skittlePallet[paletteIndex][0], skittlePallet[paletteIndex][1], skittlePallet[paletteIndex][2] );
+    pi = paletteIndex % skittlePallet.length;
+    return new THREE.Color( skittlePallet[pi][0], skittlePallet[pi][1], skittlePallet[pi][2] );
 }
 
 function makeNewSkittle( paletteIndex, x, y, z, xVel, yVel, zVel, xRot, yRot, zRot, xRotVel, yRotVel, zRotVel) {
