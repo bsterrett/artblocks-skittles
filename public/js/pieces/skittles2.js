@@ -27,43 +27,13 @@ const gravitational_acceleration = [0, -1, 0];
 
 init();
 
-function setColors( frame ) {
-    color = new THREE.Color();
-    positions1 = geometry1.attributes.position;
-    positions2 = geometry2.attributes.position;
-    positions3 = geometry3.attributes.position;
-    colors1 = geometry1.attributes.color;
-    colors2 = geometry2.attributes.color;
-    colors3 = geometry3.attributes.color;
-
-    for ( let i = 0; i < position_count; i ++ ) {
-
-        hue_offset = (frame % 10)
-
-        hue1 = (( positions1.getY( i ) / radius + 1 ) / 2);
-        // hue1 += (frame % 10) / 10;
-        // hue1 %= 1;
-        // console.log(hue1);
-        color.setHSL( hue1 , 1.0, 0.5 );
-        colors1.setXYZ( i, color.r, color.g, color.b );
-
-        color.setHSL( 0, ( positions2.getY( i ) / radius + 1 ) / 2, 0.5 );
-        colors2.setXYZ( i, color.r, color.g, color.b );
-
-        color.setRGB( 1, 0.8 - ( positions3.getY( i ) / radius + 1 ) / 2, 0 );
-        colors3.setXYZ( i, color.r, color.g, color.b );
-
-    }
-}
-
 function makeNewSkittleColor( paletteIndex ) {
     return new THREE.Color( skittlePallet[paletteIndex][0], skittlePallet[paletteIndex][1], skittlePallet[paletteIndex][2] );
 }
 
-function makeNewSkittle( paletteIndex, x, y, z, xVel, yVel, zVel, xRot, yRot, xRotVel, yRotVel) {
+function makeNewSkittle( paletteIndex, x, y, z, xVel, yVel, zVel, xRot, yRot, zRot, xRotVel, yRotVel, zRotVel) {
     const clonedGeometry = skittleGeometry.clone();
     skittleColor = makeNewSkittleColor( paletteIndex );
-    console.log(skittleColor);
     const newMaterial = new THREE.MeshPhongMaterial( {
         color: skittleColor,
         flatShading: false,
@@ -80,11 +50,13 @@ function makeNewSkittle( paletteIndex, x, y, z, xVel, yVel, zVel, xRot, yRot, xR
     skittleMesh.position.z = z;
     skittleMesh.rotation.x = xRot;
     skittleMesh.rotation.y = yRot;
+    skittleMesh.rotation.z = zRot;
     skittleMesh.xVel = xVel;
     skittleMesh.yVel = yVel;
     skittleMesh.zVel = zVel;
     skittleMesh.xRotVel = xRotVel;
     skittleMesh.yRotVel = yRotVel;
+    skittleMesh.zRotVel = zRotVel;
 
     return skittleMesh;
 }
@@ -123,7 +95,7 @@ function init() {
     skittleGeometry.applyMatrix4(new THREE.Matrix4().makeScale( 1, 0.7, 1 ));
     
     for (i = 0; i < 5; i++) {
-        s = makeNewSkittle( i, -200 + (100*i), 0, 0, 0, (6*i), 0, 0, 0, (10*i), (15*i) );
+        s = makeNewSkittle( i, -200 + (100*i), 0, 0, 0, (6*i), 0, 0, 0, 0, (10*i), (15*i), (8 * i) );
         skittles.push(s);
         scene.add(s);
     }
