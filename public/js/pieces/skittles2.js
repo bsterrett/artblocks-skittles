@@ -37,7 +37,7 @@ class SkittleFountain {
     this.skittleZVel = Math.cos(yRot) * speed;
   }
 
-  shoot() {
+  emit() {
     const s = makeNewSkittle(
         Math.floor(skittlePallet.length * Math.random()), // palette 
         this.x,
@@ -196,14 +196,14 @@ function updateSkittleRotations() {
 
 }
 
-let lastShootTime = 0;
-const shootEvery = 1000;
+let lastEmissionTime = 0;
+const emitEvery = 1000;
 
 function animation( time ) {
 
-    if (time - lastShootTime > shootEvery) {
+    if (time - lastEmissionTime > emitEvery) {
         sf.shoot();
-        lastShootTime = time;
+        lastEmissionTime = time;
     }
     
     updateSkittlePositions();
