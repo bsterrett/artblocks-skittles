@@ -9,6 +9,7 @@ let windowHalfY = window.innerHeight / 2;
 
 let skittleGeometry;
 
+const skittleGeometryDetail = 2;
 const skittleRadius = 50;
 const skittlePallet = [
     [ 230, 72,  8  ],
@@ -20,8 +21,42 @@ const skittlePallet = [
 
 let skittles = [];
 
-const gravity = false;
+const gravity = true;
 const gravitational_acceleration = [0, -1, 0];
+
+let sg;
+
+class SkittleGun {
+  constructor(x, y, z, xRot, yRot, speed) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+
+    this.skittleXVel = Math.sin(xRot) * speed;
+    this.skittleYVel = Math.cos(xRot) * speed;
+    this.skittleZVel = Math.cos(yRot) * speed;
+  }
+
+  shoot() {
+    const s = makeNewSkittle(
+        Math.floor(skittlePallet.length * Math.random()), // palette 
+        this.x,
+        this.y,
+        this.z,
+        this.skittleXVel,
+        this.skittleYVel,
+        this.skittleZVel,
+        2 * Math.PI * Math.random(), // xRot
+        2 * Math.PI * Math.random(), // yRot
+        2 * Math.PI * Math.random(), // zRot
+        -0.2 * Math.PI + (0.4 * Math.random()), // xRotVel
+        -0.2 * Math.PI + (0.4 * Math.random()), // yRotVel
+        -0.2 * Math.PI + (0.4 * Math.random()), // zRotVel
+    );
+    skittles.push(s);
+    scene.add(s);
+  }
+}
 
 init();
 
@@ -86,15 +121,17 @@ function init() {
     context.fillStyle = gradient;
     context.fillRect( 0, 0, canvas.width, canvas.height );
 
-    skittleGeometry = new THREE.IcosahedronBufferGeometry( skittleRadius, 2 );
+    skittleGeometry = new THREE.IcosahedronBufferGeometry( skittleRadius, skittleGeometryDetail );
     skittleGeometry.applyMatrix4(new THREE.Matrix4().makeScale( 1, 0.7, 1 ));
     
-    for (i = 0; i < 10; i++) {
-        // s = makeNewSkittle( i, -500 + (100*i), 0, 0, 0, (6*i), 0, 0, 0, 0, (10*i), (15*i), (8 * i) );
-        s = makeNewSkittle( i, -500 + (100*i), 0, 0, 0, 0, 0, 36 * i, 39 * i, 31 * i, 0, 0, 0 );
-        skittles.push(s);
-        scene.add(s);
-    }
+    // for (i = 0; i < 10; i++) {
+    //     // s = makeNewSkittle( i, -500 + (100*i), 0, 0, 0, (6*i), 0, 0, 0, 0, (10*i), (15*i), (8 * i) );
+    //     s = makeNewSkittle( i, -500 + (100*i), 0, 0, 0, 0, 0, 36 * i, 39 * i, 31 * i, 0, 0, 0 );
+    //     skittles.push(s);
+    //     scene.add(s);
+    // }
+
+    sg = new SkittleGun(0, 0, 0, 0, 0, 25);
 
     renderer = new THREE.WebGLRenderer( { antialias: true } );
     renderer.setPixelRatio( window.devicePixelRatio );
@@ -159,10 +196,16 @@ function updateSkittleRotations() {
 
 }
 
-//
+let lastShootTime = 0;
+const shootEvery = 100;
 
-function animation( frame ) {
+function animation( time ) {
 
+    if (time - lastShootTime > shootEvery) {
+        sg.shoot();
+        lastShootTime = time;
+    }
+    
     updateSkittlePositions();
     updateSkittleRotations();
     if ( gravity ) {
