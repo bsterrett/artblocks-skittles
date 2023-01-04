@@ -1,5 +1,3 @@
-// import * as THREE from 'three';
-
 let container;
 
 let camera, scene, renderer;
@@ -22,7 +20,7 @@ const skittlePallet = [
 
 let skittles = [];
 
-const gravity = true;
+const gravity = false;
 const gravitational_acceleration = [0, -1, 0];
 
 init();
@@ -41,11 +39,7 @@ function makeNewSkittle( paletteIndex, x, y, z, xVel, yVel, zVel, xRot, yRot, zR
         vertexColors: false,
         shininess: 0
     } );
-    // const newMaterial = new THREE.MeshNormalMaterial;
-    // const wireframeMaterial = new THREE.MeshBasicMaterial( { color: skittleColor.getHex(), wireframe: true, transparent: true } );
     const skittleMesh = new THREE.Mesh( clonedGeometry, newMaterial );
-    // let wireframe = new THREE.Mesh( clonedGeometry, wireframeMaterial );
-    // skittleMesh.add( wireframe );
     skittleMesh.position.x = x;
     skittleMesh.position.y = y;
     skittleMesh.position.z = z;
@@ -92,11 +86,12 @@ function init() {
     context.fillStyle = gradient;
     context.fillRect( 0, 0, canvas.width, canvas.height );
 
-    skittleGeometry = new THREE.IcosahedronBufferGeometry( skittleRadius, 1 );
+    skittleGeometry = new THREE.IcosahedronBufferGeometry( skittleRadius, 2 );
     skittleGeometry.applyMatrix4(new THREE.Matrix4().makeScale( 1, 0.7, 1 ));
     
-    for (i = 0; i < 5; i++) {
-        s = makeNewSkittle( i, -200 + (100*i), 0, 0, 0, (6*i), 0, 0, 0, 0, (10*i), (15*i), (8 * i) );
+    for (i = 0; i < 10; i++) {
+        // s = makeNewSkittle( i, -500 + (100*i), 0, 0, 0, (6*i), 0, 0, 0, 0, (10*i), (15*i), (8 * i) );
+        s = makeNewSkittle( i, -500 + (100*i), 0, 0, 0, 0, 0, 36 * i, 39 * i, 31 * i, 0, 0, 0 );
         skittles.push(s);
         scene.add(s);
     }
@@ -159,6 +154,7 @@ function updateSkittleRotations() {
         skittle = skittles[i];
         skittle.rotation.x += skittle.xRotVel;
         skittle.rotation.y += skittle.yRotVel;
+        skittle.rotation.z += skittle.zRotVel;
     }
 
 }
