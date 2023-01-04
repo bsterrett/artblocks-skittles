@@ -49,9 +49,9 @@ class SkittleFountain {
         2 * Math.PI * Math.random(), // xRot
         2 * Math.PI * Math.random(), // yRot
         2 * Math.PI * Math.random(), // zRot
-        -0.2 * Math.PI + (0.4 * Math.random()), // xRotVel
-        -0.2 * Math.PI + (0.4 * Math.random()), // yRotVel
-        -0.2 * Math.PI + (0.4 * Math.random()), // zRotVel
+        -0.1 * Math.PI + (0.2 * Math.random()), // xRotVel
+        -0.1 * Math.PI + (0.2 * Math.random()), // yRotVel
+        -0.1 * Math.PI + (0.2 * Math.random()), // zRotVel
     );
     skittles.push(s);
     scene.add(s);
@@ -197,7 +197,7 @@ function updateSkittleRotations() {
 }
 
 let lastShootTime = 0;
-const shootEvery = 100;
+const shootEvery = 1000;
 
 function animation( time ) {
 
