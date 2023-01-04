@@ -24,9 +24,9 @@ let skittles = [];
 const gravity = true;
 const gravitational_acceleration = [0, -1, 0];
 
-let sg;
+let sf;
 
-class SkittleGun {
+class SkittleFountain {
   constructor(x, y, z, xRot, yRot, speed) {
     this.x = x;
     this.y = y;
@@ -131,7 +131,7 @@ function init() {
     //     scene.add(s);
     // }
 
-    sg = new SkittleGun(0, 0, 0, 0, 0, 25);
+    sf = new SkittleFountain(0, 0, 0, 0, 0, 25);
 
     renderer = new THREE.WebGLRenderer( { antialias: true } );
     renderer.setPixelRatio( window.devicePixelRatio );
@@ -202,7 +202,7 @@ const shootEvery = 100;
 function animation( time ) {
 
     if (time - lastShootTime > shootEvery) {
-        sg.shoot();
+        sf.shoot();
         lastShootTime = time;
     }
     
