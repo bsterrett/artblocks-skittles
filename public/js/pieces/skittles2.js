@@ -202,7 +202,7 @@ const emitEvery = 1000;
 function animation( time ) {
 
     if (time - lastEmissionTime > emitEvery) {
-        sf.shoot();
+        sf.emit();
         lastEmissionTime = time;
     }
     
