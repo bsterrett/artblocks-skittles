@@ -21,8 +21,8 @@ let objects = []
 function randomness () {
     dots_per_circle = Math.floor(random(1,10))
     rotation = Math.PI * random()
-    initial_diameter = 100 * random(1, 1)
-    final_diameter = 10 * random(1, 1)
+    initial_diameter = 100 * random(3, 3)
+    final_diameter = 10 * random(3, 3)
     return dots_per_circle , rotation , initial_diameter ,final_diameter
 }
 
@@ -54,15 +54,14 @@ function draw_spheres(scene, z_factor, x_factor, color_line, offset_z=0, offset_
         // Create the final object to add to the scene
         const splineObject = new THREE.Line( geometry_l, material_l );
         scene.add( splineObject );
-
     }
 }
 
 function make_balloon(vector, color){
     draw_spheres(scene,  [1,1,-1,-1], [-1,1,1,-1], color,vector.x,vector.y ,vector.z , false)
     draw_spheres(scene,  [1,-1,-1,-1], [-1,1,1,-1], color,vector.x,vector.y ,vector.z , false)
-    draw_spheres(scene,  [1,1,-1,-1], [-1,1,1,-1], color,vector.x,vector.y-200 ,vector.z, true)
-    draw_spheres(scene,   [1,-1,-1,-1], [-1,1,1,-1], color,vector.x,vector.y-200 ,vector.z, true)
+    draw_spheres(scene,  [1,1,-1,-1], [-1,1,1,-1], color,vector.x,vector.y-2*initial_diameter ,vector.z, true)
+    draw_spheres(scene,   [1,-1,-1,-1], [-1,1,1,-1], color,vector.x,vector.y-2*initial_diameter ,vector.z, true)
  }
 
 
@@ -73,13 +72,13 @@ function setup() {
     camera.lookAt( 0, 0, 0 );
 
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(  'white' );
+    scene.background = new THREE.Color(  'black' );
 
     
-    make_balloon(new THREE.Vector3(180,300,100), 0x000000)
-    make_balloon(new THREE.Vector3(90,400,-60), 0x000000)
-    make_balloon(new THREE.Vector3(0,250,100), 0x000000)
-    make_balloon(new THREE.Vector3(-50,300,-50), 0x000000)
+    make_balloon(new THREE.Vector3(180,300,100), 'white')
+    make_balloon(new THREE.Vector3(90,400,-60), 'red')
+    make_balloon(new THREE.Vector3(0,250,100), 'blue')
+    make_balloon(new THREE.Vector3(-50,300,-50), 'green')
 
 
     renderer = new THREE.WebGLRenderer( { antialias: true } );
