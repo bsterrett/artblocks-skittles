@@ -1,14 +1,14 @@
-let iteration_scale = 5
-let randomness_scale = .2
-let line_count = 20
-let line_offset = 30
-let spline_segment_count = 100
-let segment_skew_factor = .5
-let spline_length = 500
+
 let steps_per_segment = 4
+
+
+// Eyebrows
+let eyebrow_spline_point_count = 30
+
 
 let splines = []
 let rays = []
+let hidden_shape_points = []
 
 
 x_offset = 100
@@ -18,40 +18,63 @@ function Point(x, y) {
   this.y = y;
 }
 
+
+let hidden_shape = [
+  new Point(300, 100),
+  new Point(500, 100),
+  new Point(500, 400),
+  new Point(300, 400),
+  new Point(300, 100)
+]
+
 class Ray {
-  constructor(point_array, center_point){
+  constructor(point_array, center_point, lerp_width , rubbing_shape=false, taper=false){
     this.point_array = point_array
     this.center_point = center_point
     this.count = 0
+    this.rubbing_shape = rubbing_shape
+    this.lerp_width = lerp_width
+    this.taper = taper
   }
-  draw() {
-    noStroke();
-    beginShape();
-    this.point_array.forEach((point) => {
-      let from = color("black");
-      let to = color("white");
-      let lerp_color = lerpColor(from, to, Math.abs(this.center_point.x - point.x) / line_offset)
-      stroke(lerp_color);
-      circle(point.x, point.y, .04);
+
+  find_closest_rubbing_shape_point(x, y){
+    let distance = Infinity
+    let p = new Point(0,0)
+    if (this.rubbing_shape){
+      this.rubbing_shape.forEach((point) => {
+        if (dist(x,y, point.x, point.y) < distance ) {
+          distance = dist(x,y, point.x, point.y)
+          p =  new Point(point.x,point.y)
+        }
     });
-    endShape()
+      return p
+    }
+    return null
   }
+
   draw_next(){
     if (this.count < this.point_array.length) {
       let from = color("black");
       let to = color("white");
-      let lerp_color = lerpColor(from, to, Math.abs(this.center_point.x - this.point_array[this.count].x) / line_offset)
+      let lerp_color = color("blue");
+      if(this.rubbing_shape){
+        let lerp_point = this.find_closest_rubbing_shape_point(this.point_array[this.count].x, this.point_array[this.count].y)
+        lerp_color = lerpColor(from, to, (this.taper ? (this.count/(this.point_array.length*2)) : 0) + Math.abs(Math.sqrt(Math.pow(lerp_point.x - this.point_array[this.count].x,2) + Math.pow(lerp_point.y - this.point_array[this.count].y,2) ) / this.lerp_width))
+      }else {
+        lerp_color = lerpColor(from, to, Math.abs(this.center_point.x - this.point_array[this.count].x) / this.lerp_width)
+      }
+
       noStroke();
       beginShape();
       stroke(lerp_color);
-      circle(this.point_array[this.count].x, this.point_array[this.count].y, .04);
+      circle(this.point_array[this.count].x, this.point_array[this.count].y, .1);
       endShape()
       this.count ++
     }
   }
 }
 
-var catmullRomFitting = function (data,alpha) {
+var catmullRomFitting = function (data,alpha, steps) {
 
     if (alpha == 0 || alpha === undefined) {
       return false;
@@ -103,20 +126,12 @@ var catmullRomFitting = function (data,alpha) {
           bp2 = p2;
         }
 
-        d += 'C' + bp1.x + ',' + bp1.y + ' ' + bp2.x + ',' + bp2.y + ' ' + p2.x + ',' + p2.y + ' ';
-        // noStroke();
-        // beginShape();
-        // stroke('black');
-        //bezier(p1.x, p1.y, bp1.x, bp1.y , bp2.x, bp2.y, p2.x,p2.y)
-        for (let i = 0; i <= steps_per_segment; i++) {
-            let t = i / steps_per_segment;
+        for (let i = 0; i <= steps; i++) {
+            let t = i / steps;
             let x = bezierPoint(p1.x, bp1.x, bp2.x, p2.x, t);
             let y = bezierPoint(p1.y, bp1.y, bp2.y, p2.y, t);
-            // circle(x, y, .4);
             point_arr.push(new Point(x,y))
         }
-        // endShape();
-        
       }
 
       return point_arr;
@@ -128,55 +143,127 @@ function animate_splines() {
   rays.forEach((ray) => {
     ray.draw_next()
   });
-  setTimeout(animate_splines, 100);
+  setTimeout(animate_splines, 1);
 }
 
 function setup() {
     createCanvas(800, 500);
-    make_gradient()
+    //make_gradient()
     background("hsl(57, 100%, 96%)");
+    //background("grey");
     noFill();
-    draw_catmul_spline()
+    let brows = make_eyebrows(400, 45,450,Math.PI/64,.2,'arched', 'curved', 3)
+    generate_iterations_from_spline(brows[0], 10, 40, true)
+    generate_iterations_from_spline(brows[1], 10, 40, true)
+
+    brows = make_eyebrows(400, 35,350,Math.PI/64,.5,'arched', 'arched', 3)
+    generate_iterations_from_spline(brows[0], 10, 40, true)
+    generate_iterations_from_spline(brows[1], 10, 40, true)
+
+    brows = make_eyebrows(400, 25,250,.5,.3,'none', 'none', 3)
+    generate_iterations_from_spline(brows[0], 10, 40, true)
+    generate_iterations_from_spline(brows[1], 10, 40, true)
+
+    //draw_catmul_spline()
     animate_splines()
+
 }
 
-function make_gradient() {
-    for(let i = 0; i < line_count; i++){
-        let iteration = []
-        for(let k = 0; k < i*iteration_scale; k++){
-            let spline = []
-            let segment_count_skew = (Math.random()-.5)*spline_segment_count*segment_skew_factor
-            let current_segment_count = spline_segment_count + segment_count_skew 
-            for (let j = 0; j < current_segment_count; j++) {
-                if (spline.length){
-                    spline.push(new Point(spline.slice(-1)[0].x  + (Math.random()-.5)*randomness_scale*k ,spline.slice(-1)[0].y  + (Math.random()-.5)*randomness_scale*k))
-                } else {
-                    spline.push(new Point(i*line_offset +(Math.random()-.5)*randomness_scale*i + x_offset, j*spline_length/current_segment_count + (Math.random()-.5)*randomness_scale*i))
-                }
+function generate_iterations_from_spline(spline_array, iterations, randomness, taper=false) {
+  let iteration = []
+  for (let k = 0; k < iterations ; k ++) {
+    let spline = []
+    for (let j = 0; j < spline_array.length; j ++) {
+      if(spline.length){
+        spline.push(new Point(((Math.random()-.5)*randomness + spline.slice(-1)[0].x + spline_array[j].x )/ 2, ((Math.random()-.5)*randomness + spline.slice(-1)[0].y + spline_array[j].y )/ 2))
+      }else {
+        spline.push(new Point((Math.random()-.5)*20 + spline_array[j].x, spline_array[j].y))
+      }
 
-                //spline.push(new Point(i*line_offset +(Math.random()-.5)*randomness_scale*i + x_offset, j*spline_length/current_segment_count + (Math.random()-.5)*randomness_scale*i))
-            }
-            iteration.push(spline)
-        }
-        splines.push(iteration)
-        iteration = [];
     }
+    iteration.push(spline)
+    rays.push(new Ray(catmullRomFitting(spline, 1, 10), new Point(0,0),30, spline_array, taper))
+  }
+  
+
+}
+
+
+
+function draw_shape(array) {
+
+  beginShape();
+  array.forEach((points) => {
+    point(points.x, points.y)
+  });
+  endShape()
+
+}
+
+function eyebrow_type(brow_type, i_value) {
+  if(brow_type == 'curved') {
+    return  (i_value - 20)*(i_value - 2)*.0125
+  }
+  else if (brow_type == 'arched') {
+    return  (i_value - 20)*(i_value - 2)*.05
+  } else {
+    return 0
+  }
+}
+
+function make_eyebrows(center_line, x_offset, base_height, tilt_angle_left, tilt_angle_right, left_type, right_type, length) {
+  let left_brow_ = []
+  let right_brow_ = []
+  for (let i = 0; i < eyebrow_spline_point_count; i++){
+    left_brow_.push(new Point( center_line - x_offset - i*Math.cos(tilt_angle_left) * length, base_height - i*Math.sin(tilt_angle_left)* length + eyebrow_type(left_type, i)))
+    right_brow_.push(new Point( center_line + x_offset + i*Math.cos(tilt_angle_right)* length, base_height - i*Math.sin(tilt_angle_right)* length + eyebrow_type(right_type, i)))
+  }
+
+  return [catmullRomFitting(left_brow_, 1, 4) , catmullRomFitting(right_brow_, 1, 4)]
 }
 
 
 function draw_catmul_spline(){
     splines.forEach((line) => {
-  
         line.forEach((iteration) => {
-            rays.push(new Ray(catmullRomFitting(iteration, 1), new Point(iteration[0].x, iteration[0].y)))
+            rays.push(new Ray(catmullRomFitting(iteration, 1, steps_per_segment), new Point(iteration[0].x, iteration[0].y), lerp_width_g))
         });
     });
 
 }
 
 
+////////////////////////////
+//// CODE GRAVEYARD
+////////////////////////////
+// let iteration_scale = 5
+// let randomness_scale = .2
+// let line_count = 20
+// let line_offset = 30
+// let lerp_width_g = 10
+// let spline_segment_count = 100
+// let segment_skew_factor = .5
+// let spline_length = 500
 
-function draw() {
+// function make_gradient() {
+//   for(let i = 0; i < line_count; i++){
+//       let iteration = []
+//       for(let k = 0; k < i*iteration_scale; k++){
+//           let spline = []
+//           let segment_count_skew = (Math.random()-.5)*spline_segment_count*segment_skew_factor
+//           let current_segment_count = spline_segment_count + segment_count_skew 
+//           for (let j = 0; j < current_segment_count; j++) {
+//               if (spline.length){
+//                   spline.push(new Point(spline.slice(-1)[0].x  + (Math.random()-.5)*randomness_scale*k ,j*spline_length/current_segment_count))
+//               } else {
+//                   spline.push(new Point(i*line_offset +(Math.random()-.5)*randomness_scale*i + x_offset, j*spline_length/current_segment_count + (Math.random()-.5)*randomness_scale*i))
+//               }
 
-    //draw_points_from_iterations()
-}
+//               //spline.push(new Point(i*line_offset +(Math.random()-.5)*randomness_scale*i + x_offset, j*spline_length/current_segment_count + (Math.random()-.5)*randomness_scale*i))
+//           }
+//           iteration.push(spline)
+//       }
+//       splines.push(iteration)
+//       iteration = [];
+//   }
+// }
