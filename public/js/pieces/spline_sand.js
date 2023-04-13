@@ -4,8 +4,12 @@ let steps_per_segment = 4
 
 let splines = []
 let rays = []
+let braids = []
 
 x_offset = 100
+
+let width = 500
+let height = 500
 
 function Point(x, y) {
   this.x = x;
@@ -13,7 +17,7 @@ function Point(x, y) {
 }
 
 class Ray {
-  constructor(point_array, center_point, lerp_width , rubbing_shape=false, taper=false, highlight=false){
+  constructor(point_array, center_point, lerp_width , rubbing_shape=false, taper=false, highlight=false, invert = false){
     this.point_array = point_array
     this.center_point = center_point
     this.count = 0
@@ -22,6 +26,7 @@ class Ray {
     this.taper = taper
     this.highlight = highlight
     this.done = false
+    this.invert = invert
   }
 
   find_closest_rubbing_shape_point(x, y){
@@ -58,11 +63,11 @@ class Ray {
           lerp_color = lerpColor(from, to, Math.abs(this.center_point.x - this.point_array[this.count].x) / this.lerp_width)
         }
   
-        noStroke();
-        beginShape();
-        stroke(lerp_color);
-        circle(this.point_array[i].x, this.point_array[i].y, .08);
-        endShape()
+        // noStroke();
+        // beginShape();
+        // stroke(lerp_color);
+        // circle(this.point_array[i].x, this.point_array[i].y, .08);
+        // endShape()
       }
   }
 
@@ -75,9 +80,13 @@ class Ray {
 
   draw_next(){
     if (this.count < this.point_array.length) {
-      let from = color("black");
-      let to = color(this.torqoise);
-      let lerp_color = color("blue");
+      let from = color("#0d235f");
+      let to = color("b0cdcb");
+      if (this.invert){
+        to = color("#0d235f");
+        from = color("b0cdcb");
+      }
+      let lerp_color = color("#0d235f");
       if(this.rubbing_shape){
         let lerp_point = this.find_closest_rubbing_shape_point(this.point_array[this.count].x, this.point_array[this.count].y)
         let lerp_pctn = (this.taper ? (this.count/(this.point_array.length*2)) : 0) + Math.abs(Math.sqrt(Math.pow(lerp_point.x - this.point_array[this.count].x,2) + Math.pow(lerp_point.y - this.point_array[this.count].y,2) ) / this.lerp_width)
@@ -105,61 +114,215 @@ class Ray {
 
 }
 
-class FaceSculpture {
-  constructor(center_line) {
-    this.left_brow_ = null
-    this.right_brow_ = null
-    this.crown_ = null
-    this.left_burn_ = null
-    this.right_burn = null
-    this.hair_ = null
-    this.brow_point_count = 30
-    this.center_line = center_line
-  }
-
-  generate_face() {
-
-  }
-
-  make_eyebrows(center_line, x_offset, base_height, tilt_angle_left, tilt_angle_right, left_type, right_type, length) {
-    let left_brow_ = []
-    let right_brow_ = []
-    for (let i = 0; i < eyebrow_spline_point_count; i++){
-      left_brow_.push(new Point( center_line - x_offset - i*Math.cos(tilt_angle_left) * length, base_height - i*Math.sin(tilt_angle_left)* length + eyebrow_type(left_type, i)))
-      right_brow_.push(new Point( center_line + x_offset + i*Math.cos(tilt_angle_right)* length, base_height - i*Math.sin(tilt_angle_right)* length + eyebrow_type(right_type, i)))
-    }
-    this.left_brow_ = catmullRomFitting(left_brow_, 1, 4)
-    this.right_brow_ =  catmullRomFitting(right_brow_, 1, 4)
-    return [this.left_brow_ , this.right_brow_]
-  }
-
-  make_sideburns(center_line, x_offset, base_height, tilt_angle_left, tilt_angle_right, left_type, right_type, length) {
-    let left_brow_ = []
-    let right_brow_ = []
-    for (let i = 0; i < eyebrow_spline_point_count; i++){
-      left_brow_.push(new Point( center_line - x_offset - i*Math.cos(tilt_angle_left) * length, base_height - i*Math.sin(tilt_angle_left)* length + burn_type(left_type, i)))
-      right_brow_.push(new Point( center_line + x_offset + i*Math.cos(tilt_angle_right)* length, base_height - i*Math.sin(tilt_angle_right)* length + burn_type(right_type, i)))
-    }
-    this.left_burn_ = catmullRomFitting(left_brow_, 1, 4)
-    this.right_burn =  catmullRomFitting(right_brow_, 1, 4)
-    return [this.left_burn_ , this.right_burn]
-  }
 
 
-  make_crown(center_line, base_height, tilt_angle_left, tilt_angle_right, left_type, right_type, length) {
-    let crown = []
-    let right_side = []
-    for (let i = 0; i < this.brow_point_count; i++){
-      crown.push(new Point( center_line - i*Math.cos(tilt_angle_left) * length, base_height - i*Math.sin(tilt_angle_left)* length + eyebrow_type(left_type, i)))
-      crown.push(new Point( center_line + i*Math.cos(tilt_angle_right)* length, base_height - i*Math.sin(tilt_angle_right)* length + eyebrow_type(right_type, i)))
-    }
+class ScalpFactory {
+  // this class needs to take in differentiating types for each piece
+  // and generate the relevant hair blocks and locs
+  // Box braids or corn rows or zig braids
+  hair_type = null
+  // total number of boxes or interlocking zags or corn rows displayed in the piece
+  hair_number = null
+  // shape of boxes or interlocking zig zags
+  hair_shape = null
+  // how big are my box braids / how much space in between zig zags / corn rows
+  hair_size = null 
+  // loc or braid
+  braid_type = null
+  // background color framing the piece
+  background_color = null
+  // the color of the hair
+  base_color = null
+  // linear interpolation color creating highlights in hair
+  highlight_color = null
 
-    this.crown_ = catmullRomFitting( crown, 1, 4)
+  width = 500
+  height = 500
+  offset = 50
 
-    return this.crown_
+
+  constructor( hair_type, hair_number, hair_shape, hair_size, braid_type, base_color, highlight_color, background_color ) {
+  // Box braids or corn rows or zig braids
+  this.hair_type = hair_type
+  this.hair_number = hair_number
+  this.hair_shape = hair_shape
+  this.hair_size = hair_size 
+  this.braid_type = braid_type
+  this.background_color = background_color
+  this.base_color = base_color
+  this.highlight_color = highlight_color
+  this.hairigon_list = []
+  this.make_hair()
+}
+  make_hair() {
+      for (let i = 0; i < this.hair_number; i++) {
+        switch(this.hair_type) {
+          case "box":
+            break;
+          case "zig":
+            // for zigg zagg pattern, the spacing is dictated by the number o zigg
+            this.hairigon_list.push(new ZigZag(new Point ((i % 2 == 0 ? this.width/2 - this.offset : this.offset) , this.offset + i*(this.height - this.offset)/this.hair_number ), (this.width - this.offset)/2 , 50, this.braid_type, i % 2 == 0 ? true:false))
+            
+            break;
+          case "cornrows":
+            let source_point = new Point (this.offset + i*(this.width - this.offset)/this.hair_number , 0)
+            switch(this.hair_shape) {
+              case "up":
+                source_point.x = this.offset + i*(this.width - this.offset)/this.hair_number
+                source_point.y = height
+                break
+              case "right":
+                source_point.x = 0
+                source_point.y = this.offset + i*(this.height - this.offset)/this.hair_number
+                break
+              case "left":
+                source_point.x = width
+                source_point.y = this.offset + i*(this.height - this.offset)/this.hair_number
+                break
+              default:
+                // We want to default to the down case
+                // this is very dangerous but I swear
+                // I know what I'm doing ...
+              case "down":
+                source_point.x = this.offset + i*(this.width - this.offset)/this.hair_number
+                source_point.y = 0
+                break
+            }
+
+            this.hairigon_list.push(new Cornrow(source_point, 30, this.hair_shape,this.braid_type))
+            break
+          default:
+            console.log(`ERROR: ${this.hair_type} not valid type`)
+        }
+      }
+
   }
 
 }
+class Hairigon {
+  backbone = []
+  constructor( base_point, braid_type=false) {
+    this.base_point = base_point
+    this.braid_type = braid_type
+  }
+}
+
+class Box extends Hairigon {
+  constructor(base_point, braid_type=false, width, height) {
+    super(base_point, braid_type)
+    this.width = width
+    this.height = height
+  }
+}
+
+class Cornrow extends Hairigon {
+  constructor(base_point, width, direction, braid_type=false) {
+    super(base_point, braid_type)
+    this.direction = direction
+    this.width = width
+
+    this.backbone = this.build_array()
+
+  }
+
+  build_array() {
+    let destination_point = new Point(0,0)
+    console.log(this.direction)
+    switch(this.direction) {
+      case "up":
+        destination_point.x = this.base_point.x
+        destination_point.y = 0
+        break
+      case "left":
+        destination_point.x = 0
+        destination_point.y = this.base_point.y
+        break
+      case "right":
+        destination_point.x = width
+        destination_point.y = this.base_point.y
+        break
+      default:
+        // We want to default to the down case
+        // this is very dangerous but I swear
+        // I know what I'm doing ...
+      case "down":
+        destination_point.x = this.base_point.x
+        destination_point.y = height
+        break
+    }
+
+
+
+    let split_length = 16
+
+    braids.push(weave_braid_along_line(get_lock_array(this.base_point.x ,this.base_point.y,this.base_point.x ,this.base_point.y, destination_point.x,  destination_point.y, 0, split_length), 20, false))
+    braids.push(weave_braid_along_line(get_lock_array(this.base_point.x, this.base_point.y,this.base_point.x ,this.base_point.y,  destination_point.x, destination_point.y, 0, split_length), 20, true))
+    braids.push(weave_braid_along_line(get_lock_array(this.base_point.x,this.base_point.y, this.base_point.x ,this.base_point.y, destination_point.x,  destination_point.y, 0, split_length), 20, true, true))
+    braids.push(weave_braid_along_line(get_lock_array(this.base_point.x, this.base_point.y, this.base_point.x ,this.base_point.y, destination_point.x,  destination_point.y, 0, split_length), 20, false, true))
+  }
+
+}
+
+class ZigZag extends Hairigon {
+  constructor(base_point, width, height, braid_type=false, flipped) {
+    super(base_point, braid_type)
+    this.width = width
+    this.height = height
+    console.log(flipped)
+    this.backbone = this.build_array(base_point.x,base_point.y,width ,height, true, flipped )
+    //generate_iterations_from_spline(this.backbone, 16, 40, false, 60, false )
+  }
+
+  build_array(x,y,w,h, braid=true, flip = false) {
+    let arr =  []
+  
+    arr.push(new Point(x,y))
+    arr.push(new Point(x+w,y))
+    arr.push(new Point(x+w,y+h ))
+    arr.push(new Point(x,y+h))
+    arr.push(new Point(x,y))
+    let rect_pts = catmullRomFitting( arr, 1,  (w+h)/32)
+  
+    let steps = 2
+    arr = []
+  
+      if (braid){
+        let split_length = 16
+        if (!flip){
+          braids.push(weave_braid_along_line(get_lock_array(x + w , y + h/2 + split_length/4, x +split_length/4, y + split_length/4, x - w/2,  y - h + split_length/4, 0, split_length), 20, false))
+          braids.push(weave_braid_along_line(get_lock_array(x + w, y + h/2 + split_length/4, x +split_length/4, y + split_length/4, x -  w/2,  y - h + split_length/4, 0, split_length), 20, true))
+          braids.push(weave_braid_along_line(get_lock_array(x + w, y + h/2 + split_length/4, x +split_length/4, y + split_length/4, x -  w/2,  y - h + split_length/4, 0, split_length), 20, true, true))
+          braids.push(weave_braid_along_line(get_lock_array(x + w, y + h/2 + split_length/4, x +split_length/4, y + split_length/4, x -  w/2,  y - h + split_length/4, 0, split_length), 20, false, true))
+        } else {
+          braids.push(weave_braid_along_line(get_lock_array(x , y + h , x , y , x+w + split_length/2, y - h, 0, split_length), 20, false))
+          braids.push(weave_braid_along_line(get_lock_array(x , y + h, x , y , x+w + split_length/2, y - h, 0, split_length), 20, true))
+          braids.push(weave_braid_along_line(get_lock_array(x , y + h, x , y , x+w + split_length/2, y -h, 0, split_length), 20, true, true))
+          braids.push(weave_braid_along_line(get_lock_array(x , y + h, x , y , x+w + split_length/2, y -h , 0, split_length), 20, false, true))
+        }
+  
+      }
+  
+      // RAYS
+      //steps = 1
+      rect_pts.forEach((point) => {
+        for (let i = 0; i <= steps; i++) {
+          let t = i / steps;
+        let x_s = curvePoint(point.x, point.x, x + w/2, x + w/2, t);
+        let y_s = curvePoint(point.y, point.y, y + h/2, y + h/2, t);
+        arr.push (new Point(x_s,y_s))
+        noStroke();
+        beginShape();
+        stroke('white');
+        circle(x_s, y_s, 5);
+        endShape()
+        }
+      })
+  
+    rect_pts = catmullRomFitting( arr, 1,  2)
+    return rect_pts
+  }
+}
+
 
 var catmullRomFitting = function (data,alpha, steps) {
 
@@ -247,9 +410,11 @@ function animate_splines() {
   if(done) {
     rays = []
     splines = []
-    let scale_factor = 1
+    let scale_factor = 10
+    let invert = false
     braids.forEach((braid) => {
-      generate_iterations_from_spline(braid, 50, 100* scale_factor, false, 90, false, true )
+      generate_iterations_from_spline(braid, 20, 100, false, 20, false, true, invert )
+      invert = !invert
       scale_factor += .5
     })
     console.log("starting animate braids")
@@ -260,66 +425,6 @@ function animate_splines() {
 
 }
 
-
-let exit_area = 500
-let major_scale_down = 50
-let minor_scale_down = 30
-function generate_ellipse_points(major_axis, minor_axis, divisions, points, rotation = 1, x= 0, y = 0){
-
-  for (let i = 0; i < 2*Math.PI; i = i + 2*Math.PI/ divisions) {
-      points.push(new Point(major_axis*Math.cos(i * rotation) + x , minor_axis*Math.sin(i * rotation) + 250 - y))
-  }
-  if(Math.PI*major_axis*minor_axis < exit_area){
-      return points
-  } else {
-      let minor_set = Math.random()* minor_scale_down
-      let major_set = Math.random()*major_scale_down
-      if(Math.random() < 1){
-        
-        generate_ellipse_points (  minor_axis - minor_set,major_axis - major_set, 50, points, rotation, x + minor_set ,y + major_set)
-      } else {
-        rotation += 1
-        generate_ellipse_points (  major_axis - major_set,minor_axis - minor_set, 50, points, rotation,x + major_set,y + minor_set)
-      }
-
-  }
-}
-
-let color_rect = 0
-let braids = []
-function drawRect(x, y, w, h)
-{
-  // first draw a rectangle
-
-
-  // then figure out if we need to draw another
-  var splitWidth = random(1) > 0.5;
-  var splitWhere = random(0.3, 0.8);
-
-  // if we're splitting the width
-  if(splitWidth && w > 400)
-  {
-    drawRect(x, y, w * splitWhere, h);
-    drawRect(x + (w * splitWhere), y, w * (1 - splitWhere), h);
-  }
-  // else if we're splitting the height
-  else if(h > 200)
-  {
-    drawRect(x, y, w, h * splitWhere);
-    drawRect(x, y + (h * splitWhere), w, h * (1 - splitWhere));
-  }
-  else {
-    let points = []
-    // noFill();
-    let color = color_rect % 360
-    color_rect = color_rect + 30
-    console.log("drawing")
-    generate_iterations_from_spline(get_rectangle_array(x,y,w/2 ,h - h/2 ), 16, 40, false, 60, false  )//`hsl(${color}, 96%, 54%)` )
-
-    return
-  }
-}
-
 function get_lock_array(x1,y1,x_a, y_a, x2,y2, width=0, steps=32) {
   let arr  = []
   for (let i = 0 ; i < steps; i++){
@@ -327,70 +432,77 @@ function get_lock_array(x1,y1,x_a, y_a, x2,y2, width=0, steps=32) {
     let x_s = curvePoint(x_a,x1, 1.5*x2, x1, t);
     let y_s = curvePoint(y_a,y1, 1.5*y2, 5*y2, t);
     arr.push (new Point(x_s,y_s))
-    // noStroke();
-    // beginShape();
-    // stroke('red');
-    // circle(x_s, y_s, 5);
-    // endShape()
+    noStroke();
+    beginShape();
+    stroke('red');
+    circle(x_s, y_s, 5);
+    endShape()
   }
   return arr
 }
 
-let braid = false;
+function weave_braid_along_line(loc_array, scale = 1, invert = false, offset = false) {
+  // here we build a sin wave along a cuve using polyno
 
-function get_rectangle_array(x,y,w,h) {
+  let alernate = invert ? 1 : -1
+  let ret_array = []
+  for(let i = 0; i < loc_array.length -1; i++) {
+    let midpoint = new Point((loc_array[i].x + loc_array[i+1].x) /2, (loc_array[i].y + loc_array[i+1].y) /2)
+    let magnitude = Math.sqrt( Math.pow(loc_array[i + 1].x - loc_array[i].x, 2)  + Math.pow(loc_array[i + 1].y - loc_array[i].y, 2))
+
+      if (offset) {
+        let mid_point_x = loc_array[i].x - scale * alernate*(loc_array[i+1].x -loc_array[i].x)/ magnitude
+        let mid_point_y = loc_array[i].y + scale * alernate*(loc_array[i+1].y -loc_array[i].y)/ magnitude
+        ret_array.push(new Point(mid_point_x, mid_point_y))
+        ret_array.push(midpoint)
+
+      } else {
+        
+        let mid_point_x = midpoint.x - scale * alernate*(loc_array[i+1].x -loc_array[i].x)/ magnitude
+        let mid_point_y = midpoint.y + scale * alernate*(loc_array[i+1].y -loc_array[i].y)/ magnitude
+        // console.log(new Point(mid_point_x, mid_point_y))
+        // console.log(midpoint)
+        ret_array.push(new Point(loc_array[i].x, loc_array[i].y))
+        ret_array.push(new Point(mid_point_x, mid_point_y))
+      }
+  }
+
+  let sin_spline = catmullRomFitting( ret_array, 1, 4)
+
+  sin_spline.forEach((point) => { 
+    noStroke();
+    beginShape();
+    stroke('green');
+    circle(point.x, point.y , 2);
+    alernate = alernate * -1
+    endShape()   
+  })
+  return sin_spline
+}
+
+function get_rectangle_array(x,y,w,h, braid=true) {
   let arr =  []
+
   arr.push(new Point(x,y))
   arr.push(new Point(x+w,y))
-  arr.push(new Point(x+w,y+h))
+  arr.push(new Point(x+w,y+h ))
   arr.push(new Point(x,y+h))
   arr.push(new Point(x,y))
   let rect_pts = catmullRomFitting( arr, 1,  (w+h)/32)
-  // rect_pts.forEach((point) => {
-  //   noStroke();
-  //   beginShape();
-  //   stroke('white');
-  //   circle(point.x, point.y, 5);
-  //   endShape()
-  // })
 
-  // noStroke();
-  // beginShape();
-  // stroke('red');
-  // circle((x + w/2), (y + h/2 ), 5);
-  // endShape()
-  let steps = 6
+  let steps = 5
   arr = []
 
-    // SPIRALS
-    // for (let i = 0; i <= steps; i++) {
-    // rect_pts.forEach((point) => {
-
-    //     let t = i / steps;
-    //   let x_s = curvePoint(point.x, point.x, x + w/2, x + w/2, t);
-    //   let y_s = curvePoint(point.y, point.y, y + h/2, y + h/2, t);
-    //   arr.push (new Point(x_s,y_s))
-    //   //       noStroke();
-    //   // beginShape();
-    //   // stroke('black');
-    //   // circle(x_s, y_s, 5);
-    //   // endShape()
-    // })
-    // }
-
-    if (!braid){
-      braids.push(get_lock_array(x + w/2, y + h/2 + 10, x +10, y + 10, x+w + 10, y+h +30))
-      braids.push(get_lock_array(x + w/2 + 15, y + h/2, x , y, x+w, y+h))
-      braids.push(get_lock_array(x + w/2, y + h/2, x , y, x+w, y+h))
-      braids.push(get_lock_array(x + w/2, y + h/2 -10, x - 10, y -10, x+w -10, y+h + 30))
-      braids.push(get_lock_array(x + w/2 - 15, y + h/2, x , y, x+w, y+h))
-      braid = true
-    }else {
-      //braid = false
+    if (braid){
+      let split_length = 15
+      braids.push(weave_braid_along_line(get_lock_array(x + w/2, y + h/2 + split_length/4, x +split_length/4, y + split_length/4, x+w + split_length/2, y+h +split_length/2, 0, split_length), 10, false))
+      braids.push(weave_braid_along_line(get_lock_array(x + w/2, y + h/2 + split_length/4, x +split_length/4, y + split_length/4, x+w + split_length/2, y+h +split_length/2, 0, split_length), 10, true))
+      braids.push(weave_braid_along_line(get_lock_array(x + w/2, y + h/2 + split_length/4, x +split_length/4, y + split_length/4, x+w + split_length/2, y+h +split_length/2, 0, split_length), 10, true, true))
+      braids.push(weave_braid_along_line(get_lock_array(x + w/2, y + h/2 + split_length/4, x +split_length/4, y + split_length/4, x+w + split_length/2, y+h +split_length/2, 0, split_length), 10, false, true))
     }
 
-
     // RAYS
+    //steps = 1
     rect_pts.forEach((point) => {
       for (let i = 0; i <= steps; i++) {
         let t = i / steps;
@@ -409,66 +521,27 @@ function get_rectangle_array(x,y,w,h) {
   return rect_pts
 }
 
+
+
 function setup() {
-    let width = 500
-    let height = 500
+
     createCanvas(width, height);
     //background("hsl(57, 100%, 96%)");
-    background("#b4e7e0");
+    background("#d56d6e");
     noFill();
     //drawRect(100, 100, width - 200, height - 200);
     // middle
-    generate_iterations_from_spline(get_rectangle_array(100,100,width/2 ,height - height/2 ), 16, 40, false, 60, false )
-    // right
-    generate_iterations_from_spline(get_rectangle_array(100 + width/2 + 50,100,width/2 ,height - height/2 ), 16, 40, false, 60, false )
-    // top middle
-    generate_iterations_from_spline(get_rectangle_array(100,100 - (height - height/2) - 50,width/2 ,height - height/2 ), 16, 40, false, 60, false )
-    // bottom middle
-    generate_iterations_from_spline(get_rectangle_array(100,100 + (height - height/2) +50,width/2 ,height - height/2 ), 16, 40, false, 60, false )
-    // left
-    generate_iterations_from_spline(get_rectangle_array(100 - width/2 - 50,100,width/2 ,height - height/2 ), 16, 40, false, 60, false )
+    //generate_iterations_from_spline(get_rectangle_array(100,100,width/2 ,height - height/2 ), 16, 40, false, 80, false )
+    // // right
+    // //generate_iterations_from_spline(get_rectangle_array(100 + width/2 + 50,100,width/2 ,height - height/2 ), 16, 40, false, 60, false )
+    // // top middle
+    // generate_iterations_from_spline(get_rectangle_array(100,100 - (height - height/2) - 50,width/2 ,height - height/2 ), 16, 40, false, 60, false )
+    // // bottom middle
+    // generate_iterations_from_spline(get_rectangle_array(100,100 + (height - height/2) +50,width/2 ,height - height/2 ), 16, 40, false, 60, false )
+    // // left
+    // generate_iterations_from_spline(get_rectangle_array(100 - width/2 - 50,100,width/2 ,height - height/2 ), 16, 40, false, 60, false )
 
-    // generate_iterations_from_spline(get_rectangle_array(100 + width/2 + 50,100,width/2 ,height - height/2 ), 16, 40, false, 60, false )
-    // generate_iterations_from_spline(get_rectangle_array(100 + width/2 + 50,100,width/2 ,height - height/2 ), 16, 40, false, 60, false )
-    // generate_iterations_from_spline(get_rectangle_array(100 + width/2 + 50,100,width/2 ,height - height/2 ), 16, 40, false, 60, false )
-    // generate_iterations_from_spline(get_rectangle_array(100 + width/2 + 50,100,width/2 ,height - height/2 ), 16, 40, false, 60, false )
-    // generate_iterations_from_spline(get_rectangle_array(100 + width/2 + 50,100,width/2 ,height - height/2 ), 16, 40, false, 60, false )
-
-
-
-
-
-
-    //generate_iterations_from_spline(get_rectangle_array(100,100,width/2 ,height - height/2 ), 16, 40, false, 60, false )
-    //get_rectangle_array(100,100,width/2 ,height - height/2 )
-    // f = new FaceSculpture(400)
-    // let brows = f.make_eyebrows(400, 45,450,Math.PI/64,Math.PI/64,'arched', 'arched', 3)
-    // generate_iterations_from_spline(brows[0], 10, 40, true)
-    // generate_iterations_from_spline(brows[1], 10, 40, true)
-
-    //generate_iterations_from_spline(get_rectangle_array(100,100,50,100), 5, 20, false, 10)
-
-    // let crown = f.make_crown(400,375,Math.PI/64,Math.PI/64,'arched', 'arched', 6)
-    // generate_iterations_from_spline(crown, 30, 100, true)
-
-    // let burns = f.make_sideburns(400, 160,450,Math.PI/4,Math.PI/4,'arched', 'arched', 2)
-    // generate_iterations_from_spline(burns[0], 10, 40, true)
-    // generate_iterations_from_spline(burns[1], 10, 40, true)
-    // let points = []
-    // generate_ellipse_points(150, 200, 20, points)
-    // generate_iterations_from_spline(points, 20, 40, true)
-    // brows = f.make_eyebrows(400, 25,250,.5,.3,'none', 'none', 3)
-    // generate_iterations_from_spline(brows[0], 10, 40, true)
-    // generate_iterations_from_spline(brows[1], 10, 40, true)
-
-    // draw_catmul_spline()
-    // rays.forEach((ray) => {
-    //   ray.draw()
-    // });
-
-
-    // rays = []
-    // splines = []
+    let s = new ScalpFactory("cornrows", 5, 'left', "small", "braid", "black", "white", "torquoise")
 
     animate_splines()
 
@@ -479,7 +552,7 @@ function setup() {
 
 }
 
-function generate_iterations_from_spline(spline_array, iterations, randomness, taper=false,color_line=30,  highlight='hsl(180, 96%, 54%)',randomness_taper=false ) {
+function generate_iterations_from_spline(spline_array, iterations, randomness, taper=false,color_line=30,  highlight='hsl(180, 96%, 54%)',randomness_taper=false, invert = false ) {
   let iteration = []
 
   for (let k = 0; k < iterations ; k ++) {
@@ -487,8 +560,8 @@ function generate_iterations_from_spline(spline_array, iterations, randomness, t
     for (let j = 0; j < spline_array.length; j ++) {
       if(spline.length){
         if(randomness_taper) {
-          console.log(Math.min(200,Math.max(4*randomness/(spline_array.length - j), 1)))
-          spline.push(new Point(((Math.random()-.5)*Math.min(40,Math.max(4*randomness/(spline_array.length - j), 1)) + spline.slice(-1)[0].x + spline_array[j].x )/ 2, ((Math.random()-.5)*Math.min(40,Math.max(4*randomness/(spline_array.length - j), 1)) + spline.slice(-1)[0].y + spline_array[j].y )/ 2))
+          //console.log(Math.min(200,Math.max(4*randomness/(spline_array.length - j), 1)))
+          spline.push(new Point(((Math.random()-.5)*Math.min(40,Math.max(2*randomness/(spline_array.length - j), 20)) + spline.slice(-1)[0].x + spline_array[j].x )/ 2, ((Math.random()-.5)*Math.min(40,Math.max(2*randomness/(spline_array.length - j), 20)) + spline.slice(-1)[0].y + spline_array[j].y )/ 2))
         } else {
           spline.push(new Point(((Math.random()-.5)*randomness + spline.slice(-1)[0].x + spline_array[j].x )/ 2, ((Math.random()-.5)*randomness + spline.slice(-1)[0].y + spline_array[j].y )/ 2))          
         }
@@ -499,7 +572,7 @@ function generate_iterations_from_spline(spline_array, iterations, randomness, t
 
     }
     iteration.push(spline)
-    rays.push(new Ray(catmullRomFitting(spline, 1, 10), new Point(0,0),color_line, spline_array, taper, highlight))
+    rays.push(new Ray(catmullRomFitting(spline, 1, 10), new Point(0,0),color_line, spline_array, taper, highlight, invert))
   }
   
 
@@ -550,51 +623,3 @@ function draw_catmul_spline(){
     });
 
 }
-
-
-////////////////////////////
-//// CODE GRAVEYARD
-////////////////////////////
-// let iteration_scale = 5
-// let randomness_scale = .2
-// let line_count = 20
-// let line_offset = 30
-
-// let spline_segment_count = 100
-// let segment_skew_factor = .5
-// let spline_length = 500
-
-// let hidden_shape_points = []
-// let hidden_shape = [
-//   new Point(300, 100),
-//   new Point(500, 100),
-//   new Point(500, 400),
-//   new Point(300, 400),
-//   new Point(300, 100)
-// ]
-
-function make_gradient(line_count,iteration_scale, line_offset, randomness_scale, spline_length, x_start, y_start) {
-  let spline_segment_count = 100
-  let segment_skew_factor = .5
-  for(let i = 0; i < line_count; i++){
-      let iteration = []
-      for(let k = 0; k < i*iteration_scale; k++){
-          let spline = []
-          let segment_count_skew = (Math.random()-.5)*spline_segment_count*segment_skew_factor
-          let current_segment_count = spline_segment_count + segment_count_skew 
-          for (let j = 0; j < current_segment_count; j++) {
-              if (spline.length){
-                  spline.push(new Point(spline.slice(-1)[0].x  + (Math.random()-.5)*randomness_scale*k ,spline.slice(-1)[0].y  + (Math.random()-.5)*randomness_scale*k))
-              } else {
-                  spline.push(new Point(i*line_offset +(Math.random()-.5)*randomness_scale*i + x_start, j*spline_length/current_segment_count + (Math.random()-.5)*randomness_scale*i + y_start))
-              }
-
-              //spline.push(new Point(i*line_offset +(Math.random()-.5)*randomness_scale*i + x_offset, j*spline_length/current_segment_count + (Math.random()-.5)*randomness_scale*i))
-          }
-          iteration.push(spline)
-      }
-      splines.push(iteration)
-      iteration = [];
-  }
-}
-
