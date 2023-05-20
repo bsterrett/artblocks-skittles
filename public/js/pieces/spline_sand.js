@@ -5,16 +5,74 @@ let steps_per_segment = 4
 let splines = []
 let rays = []
 let hair_piece = []
+var timeouts = [];
 
 x_offset = 100
 
-let width = 500
-let height = 500
+var DEFAULT_SIZE = 500;
+var WIDTH = window.innerWidth;
+var HEIGHT = window.innerHeight;
+var DIM = Math.min(WIDTH, HEIGHT);
+var M = DIM / DEFAULT_SIZE;
 
 function Point(x, y) {
   this.x = x;
   this.y = y;
 }
+
+class Random {
+  constructor() {
+    this.useA = false;
+    let sfc32 = function (uint128Hex) {
+      let a = parseInt(uint128Hex.substring(0, 8), 16);
+      let b = parseInt(uint128Hex.substring(8, 16), 16);
+      let c = parseInt(uint128Hex.substring(16, 24), 16);
+      let d = parseInt(uint128Hex.substring(24, 32), 16);
+      return function () {
+        a |= 0;
+        b |= 0;
+        c |= 0;
+        d |= 0;
+        let t = (((a + b) | 0) + d) | 0;
+        d = (d + 1) | 0;
+        a = b ^ (b >>> 9);
+        b = (c + (c << 3)) | 0;
+        c = (c << 21) | (c >>> 11);
+        c = (c + t) | 0;
+        return (t >>> 0) / 4294967296;
+      };
+    };
+    // seed prngA with first half of tokenData.hash
+    this.prngA = new sfc32(tokenData.hash.substring(2, 34));
+    // seed prngB with second half of tokenData.hash
+    this.prngB = new sfc32(tokenData.hash.substring(34, 66));
+    for (let i = 0; i < 1e6; i += 2) {
+      this.prngA();
+      this.prngB();
+    }
+  }
+  // random number between 0 (inclusive) and 1 (exclusive)
+  random_dec() {
+    this.useA = !this.useA;
+    return this.useA ? this.prngA() : this.prngB();
+  }
+  // random number between a (inclusive) and b (exclusive)
+  random_num(a, b) {
+    return a + (b - a) * this.random_dec();
+  }
+  random_int(a, b) {
+    return Math.floor(this.random_num(a, b + 1));
+  }
+  
+  random_choice(list) {
+    return list[this.random_int(0, list.length - 1)];
+  }
+
+}
+
+let R = new Random();
+
+
 
 class Ray {
   constructor(point_array, center_point, lerp_width , rubbing_shape=false, taper=false, highlight=false, invert = false, base_color="black", highlight_color='white'){
@@ -68,14 +126,32 @@ class Ray {
       }
   }
 
-  brown_color = "#cea86c"
-	torqoise = "#b3e7bf"
-  
-  pink = "#ff79c6"
-  off_black = "#282a36"
-  yellow_gold = "#feff00"
+  draw_next_simple(){
+    if(this.count == 0){
+      this.count = 32
+    }
+    if (this.count < this.point_array.length) {
+      stroke(color(this.highlight_color));
+      circle(this.point_array[this.count].x, this.point_array[this.count].y, .04 * M);
+      this.count ++
+    } else {
+      this.done = true
+    }
+  }
+
+  out_of_bounds(){
+    if(this.count >= this.point_array.length || (this.point_array[this.count].x > DIM || this.point_array[this.count].y > DIM)) {
+      return true
+    }
+    else {
+      return false
+    }
+  }
 
   draw_next(){
+    if(this.out_of_bounds())  {
+      this.done = true
+    }
     if (this.count < this.point_array.length) {
       //console.log(this.base_color, this.highlight_color)
       let from = color(this.base_color);
@@ -101,7 +177,7 @@ class Ray {
       noStroke();
       beginShape();
       stroke(lerp_color);
-      circle(this.point_array[this.count].x, this.point_array[this.count].y, .08);
+      circle(this.point_array[this.count].x, this.point_array[this.count].y, .04* M);
       endShape()
       this.count ++
     } else {
@@ -134,14 +210,14 @@ class ScalpFactory {
   grid_width = null
   
   size_ref = {
-    "tiny" : 80,
-    "small" : 180,
-    "medium" : 255,
-    "large" : 300,
+    "tiny" : 80 * M,
+    "small" : 180* M,
+    "medium" : 255* M,
+    "large" : 300* M,
   }
 
-  width = 500
-  height = 500
+  width = WIDTH
+  height = HEIGHT
   offset = 1
   
 
@@ -162,28 +238,62 @@ class ScalpFactory {
   this.grid_width = grid_width
   this.hairigon_list = [[]]
   this.make_hair()
+  this.push_to_hairigon_list = true
 }
 
-  are_you_above_me (current_x, row){
-    let test_x = 0
+  are_you_above_me (current_x, current_size, row){
+    let test_x = 0;//this.size_ref[current_size]
 
     for(let i = 0; i < row.length; i++){
       if (current_x <= (test_x + this.size_ref[row[i].size_txt] ) ) {
-        return this.size_ref[row[i].size_txt]
+        // if the current shape is bigger than the shape above it we space from the next shape
+        if (this.size_ref[row[i].size_txt] < this.size_ref[current_size] && (i + 1 != row.length) ) {
+          print(row[i].size_txt ,row[i + 1].size_txt,  current_size  )
+          if(this.size_ref[row[i].size_txt] > this.size_ref[row[i +1].size_txt]){
+            this.push_to_hairigon_list = true
+            return this.size_ref[row[i].size_txt] 
+          }
+          this.push_to_hairigon_list = false
+          return this.size_ref[row[i + 1].size_txt]
+        }
+        this.push_to_hairigon_list = true
+        return this.size_ref[row[i].size_txt] 
       } else {
         test_x += this.size_ref[row[i].size_txt]
       }
     }
-
+    this.push_to_hairigon_list = true
     return 0
   }
 
-  what_is_above_me(current_x) {
+  biggest_in_row (row) {
+    let biggest_size =0;
+    if(row){
+      row.forEach((box) => { 
+        if (this.size_ref[box.size_txt] > biggest_size) {
+          biggest_size = this.size_ref[box.size_txt]
+        }
+      })
+    }
+    return biggest_size
+  }
+
+  what_is_above_me(current_x, current_size) {
     let y_offset = 0
     // for each row I'm not in
-    this.hairigon_list.forEach((row) => {
-      y_offset += this.are_you_above_me(current_x, row)
-    })
+    
+    for (let i = 0; i < this.hairigon_list.length; i++) {
+      let current_biggest = this.biggest_in_row(this.hairigon_list[i-1])
+      // if we have room to fit it we shove it in and pop it out the row
+      if(this.size_ref[current_size] + y_offset < current_biggest){
+        return y_offset
+      } else {
+        // if(i > 0){
+        //   y_offset += current_biggest - this.are_you_above_me(current_x,current_size, this.hairigon_list[i-1])
+        // }
+        y_offset += this.are_you_above_me(current_x,current_size, this.hairigon_list[i])
+      }
+    }
     // Figure out if there is a box ave me and add its height to mine
     return y_offset
   }
@@ -196,7 +306,7 @@ class ScalpFactory {
         switch(this.hair_type) {
           case "box":
             if(x_offset > width || y_offset != 0) {
-              y_offset = this.what_is_above_me((x_offset % width))
+              y_offset = this.what_is_above_me((x_offset % width),this.hair_size[i])
               if(x_offset > width){
                 x_offset =  this.offset 
                 current_row += 1
@@ -204,13 +314,13 @@ class ScalpFactory {
               }
             }
             let box_point = new Point ( x_offset  ,  this.offset + y_offset )
-            let bp2 = new Point ( x_offset  ,  this.offset + y_offset + height/2 )
-            let bp3 = new Point ( x_offset  ,  box_point.y +  this.size_ref["tiny"])
+            if(this.offset + y_offset >= HEIGHT){
+              console.log("exiting early")
+              return
+            }
             x_offset = (this.size_ref[this.hair_size[i]] + x_offset)            
             if (this.hair_size[i] != "none"){
               this.hairigon_list[current_row].push(new Box(box_point, this.braid_type, this.hair_size[i] ,this.hair_size[i], this.base_color, this.highlight_color))
-              //this.hairigon_list.push(new Box(bp2, this.braid_type, this.hair_size[i] ,this.hair_size[i], this.base_color, this.highlight_color))
-              //this.hairigon_list.push(new Box(bp3, this.braid_type, this.hair_size[i] ,this.hair_size[i], this.base_color, this.highlight_color))                  
             }
             break;
           case "zig":
@@ -261,16 +371,17 @@ class Hairigon {
     this.braid_type = braid_type
     this.base_color = base_color
     this.highlight_color = highlight_color
+    this.braids  = []
   }
 }
 
 class Box extends Hairigon {
 
   size = {
-    "tiny" : 50,
-    "small" : 150,
-    "medium" : 200,
-    "large" : 300,
+    "tiny" : 50* M,
+    "small" : 150* M,
+    "medium" : 200* M,
+    "large" : 300* M,
   }
 
   constructor(base_point, braid_type=false, width, height , base_color , highlight_color) {
@@ -304,43 +415,47 @@ class Box extends Hairigon {
     let arr =  []
     let theta = 0
     let rotated_bp = 0
+    let rect_pts = 0
     arr.push(new Point(this.base_point.x,this.base_point.y))
     arr.push(new Point(this.base_point.x+this.width,this.base_point.y))
     arr.push(new Point(this.base_point.x+this.width,this.base_point.y+this.height ))
     arr.push(new Point(this.base_point.x,this.base_point.y+this.height))
     arr.push(new Point(this.base_point.x,this.base_point.y))
-    let rect_pts = catmullRomFitting( arr, 1,  (this.width+this.height)/32)
-    // if (this.size_txt = "tiny"){
-    //   rect_pts = catmullRomFitting( arr, 1,  (this.width+this.height)/4)
-    // }
-    // rect_pts.forEach((point) => { 
-    //   noStroke();
-    //   beginShape();
-    //   stroke('red');
-    //   circle(point.x, point.y, 5);
-    //   endShape()
-    // })
-    
+    rect_pts = catmullRomFitting( arr, 1,  (this.width+this.height)/32)
+
 
     
     rotated_bp = this.rotate_parametric(this.base_point.x+ this.width/2 , this.base_point.y + this.height/2, Math.PI/4)
 
-    let steps = 4
+    let steps = 4 
+    print(M)
     arr = []
 
+    let scale_braid = 2 * M
+    switch(this.size_txt ){
+      case "tiny":
+        break;
+      case "small":
+        scale_braid +=2
+        break;
+      case "medium":
+        scale_braid +=2
+    }
+      
+
       if (this.braid_type == "loc"){
-        let split_length = 25
+        let split_length = 25 * M
         this.braids.push(get_lock_array(rotated_bp.x + this.width/2, rotated_bp.y + this.height/2 - split_length/4, rotated_bp.x +split_length/4, rotated_bp.y + split_length/4, rotated_bp.x+this.width + split_length/2, rotated_bp.y+this.height +split_length/2, 30, split_length))
         this.braids.push(get_lock_array(rotated_bp.x + this.width/2, rotated_bp.y + this.height/2 - split_length/4, rotated_bp.x +split_length/4, rotated_bp.y + split_length/4, rotated_bp.x+this.width + split_length/2, rotated_bp.y+this.height +split_length/2, 30, split_length))
         this.braids.push(get_lock_array(rotated_bp.x + this.width/2, rotated_bp.y + this.height/2 - split_length/4, rotated_bp.x +split_length/4, rotated_bp.y + split_length/4, rotated_bp.x+this.width + split_length/2, rotated_bp.y+this.height +split_length/2, 30, split_length))
         this.braids.push(get_lock_array(rotated_bp.x + this.width/2, rotated_bp.y + this.height/2 - split_length/4, rotated_bp.x +split_length/4, rotated_bp.y + split_length/4, rotated_bp.x+this.width + split_length/2, rotated_bp.y+this.height +split_length/2, 30, split_length))
         hair_piece.push(this)
       } else if(this.braid_type == "braid") {
-        let split_length = 10
-        this.braids.push(weave_braid_along_line(get_lock_array(this.base_point.x + this.width/2, this.base_point.y + this.height/2 + split_length/4, rotated_bp.x +split_length/4, rotated_bp.y + split_length/4, rotated_bp.x+this.width + split_length/2, rotated_bp.y+this.height +split_length/2, (this.width == this.size["tiny"]) ? false: false, split_length), 5, false))
-        this.braids.push(weave_braid_along_line(get_lock_array(this.base_point.x + this.width/2, this.base_point.y + this.height/2 + split_length/4, rotated_bp.x +split_length/4, rotated_bp.y + split_length/4, rotated_bp.x+this.width + split_length/2, rotated_bp.y+this.height +split_length/2, (this.width == this.size["tiny"]) ? false: false, split_length), 5, true))
-        this.braids.push(weave_braid_along_line(get_lock_array(this.base_point.x + this.width/2, this.base_point.y + this.height/2 + split_length/4, rotated_bp.x +split_length/4, rotated_bp.y + split_length/4, rotated_bp.x+this.width + split_length/2, rotated_bp.y+this.height +split_length/2, (this.width == this.size["tiny"]) ? false: false, split_length), 5, true, true))
-        this.braids.push(weave_braid_along_line(get_lock_array(this.base_point.x + this.width/2, this.base_point.y + this.height/2 + split_length/4, rotated_bp.x +split_length/4, rotated_bp.y + split_length/4, rotated_bp.x+this.width + split_length/2, rotated_bp.y+this.height +split_length/2, (this.width == this.size["tiny"]) ? false: false, split_length), 5, false, true))
+        let split_length = 10* M
+        this.braids.push(weave_braid_along_line(get_lock_array(this.base_point.x + this.width/2, this.base_point.y + this.height/2 + split_length/4, rotated_bp.x +split_length/4, rotated_bp.y + split_length/4, rotated_bp.x+this.width + split_length/2, rotated_bp.y+this.height +split_length/2, (this.width == this.size["tiny"]) ? false: false, split_length), scale_braid, false))
+        this.braids.push(weave_braid_along_line(get_lock_array(this.base_point.x + this.width/2, this.base_point.y + this.height/2 + split_length/4, rotated_bp.x +split_length/4, rotated_bp.y + split_length/4, rotated_bp.x+this.width + split_length/2, rotated_bp.y+this.height +split_length/2, (this.width == this.size["tiny"]) ? false: false, split_length),scale_braid, true))
+        this.braids.push(weave_braid_along_line(get_lock_array(this.base_point.x + this.width/2, this.base_point.y + this.height/2 + split_length/4, rotated_bp.x +split_length/4, rotated_bp.y + split_length/4, rotated_bp.x+this.width + split_length/2, rotated_bp.y+this.height +split_length/2, (this.width == this.size["tiny"]) ? false: false, split_length), scale_braid, true, true))
+        this.braids.push(weave_braid_along_line(get_lock_array(this.base_point.x + this.width/2, this.base_point.y + this.height/2 + split_length/4, rotated_bp.x +split_length/4, rotated_bp.y + split_length/4, rotated_bp.x+this.width + split_length/2, rotated_bp.y+this.height +split_length/2, (this.width == this.size["tiny"]) ? false: false, split_length), scale_braid, false, true))
         hair_piece.push(this)
       }
   
@@ -359,117 +474,21 @@ class Box extends Hairigon {
         // endShape()
         }
       })
-  
-    rect_pts = catmullRomFitting( arr, 1,  2)
-    return rect_pts
-  }
-
-}
-
-class Cornrow extends Hairigon {
-  constructor(base_point, width, direction, braid_type=false) {
-    super(base_point, braid_type)
-    this.direction = direction
-    this.width = width
-
-    this.backbone = this.build_array()
-
-  }
-
-  build_array() {
-    let destination_point = new Point(0,0)
-
-    switch(this.direction) {
-      case "up":
-        destination_point.x = this.base_point.x
-        destination_point.y = 0
-        break
-      case "left":
-        destination_point.x = 0
-        destination_point.y = this.base_point.y
-        break
-      case "right":
-        destination_point.x = width
-        destination_point.y = this.base_point.y
-        break
-      default:
-        // We want to default to the down case
-        // this is very dangerous but I swear
-        // I know what I'm doing ...
-      case "down":
-        destination_point.x = this.base_point.x
-        destination_point.y = height
-        break
+    let cat_step = 1
+    switch(this.size_txt ){
+      case "tiny":
+        break;
+      case "small":
+        cat_step +=2
+        break;
+      case "medium":
+        cat_step +=3
     }
-    let split_length = 16
-
-    this.braids.push(weave_braid_along_line(get_lock_array(this.base_point.x ,this.base_point.y,this.base_point.x ,this.base_point.y, destination_point.x,  destination_point.y, 0, split_length), 20, false))
-    this.braids.push(weave_braid_along_line(get_lock_array(this.base_point.x, this.base_point.y,this.base_point.x ,this.base_point.y,  destination_point.x, destination_point.y, 0, split_length), 20, true))
-    this.braids.push(weave_braid_along_line(get_lock_array(this.base_point.x,this.base_point.y, this.base_point.x ,this.base_point.y, destination_point.x,  destination_point.y, 0, split_length), 20, true, true))
-    this.braids.push(weave_braid_along_line(get_lock_array(this.base_point.x, this.base_point.y, this.base_point.x ,this.base_point.y, destination_point.x,  destination_point.y, 0, split_length), 20, false, true))
-    hair_piece.push(this)
-  }
-
-}
-
-class ZigZag extends Hairigon {
-  constructor(base_point, width, height, braid_type=false, flipped) {
-    super(base_point, braid_type)
-    this.width = width
-    this.height = height
-    this.backbone = this.build_array(base_point.x,base_point.y,width ,height, true, flipped )
-    //generate_iterations_from_spline(this.backbone, 16, 40, false, 60, false )
-  }
-
-  build_array(x,y,w,h, braid=true, flip = false) {
-    let arr =  []
-  
-    arr.push(new Point(x,y))
-    arr.push(new Point(x+w,y))
-    arr.push(new Point(x+w,y+h ))
-    arr.push(new Point(x,y+h))
-    arr.push(new Point(x,y))
-    let rect_pts = catmullRomFitting( arr, 1,  (w+h)/32)
-  
-    let steps = 2
-    arr = []
-  
-      if (braid){
-        let split_length = 16
-        if (!flip){
-          this.braids.push(weave_braid_along_line(get_lock_array(x + w , y + h/2 + split_length/4, x +split_length/4, y + split_length/4, x - w/2,  y - h + split_length/4, 0, split_length), 20, false))
-          this.braids.push(weave_braid_along_line(get_lock_array(x + w, y + h/2 + split_length/4, x +split_length/4, y + split_length/4, x -  w/2,  y - h + split_length/4, 0, split_length), 20, true))
-          this.braids.push(weave_braid_along_line(get_lock_array(x + w, y + h/2 + split_length/4, x +split_length/4, y + split_length/4, x -  w/2,  y - h + split_length/4, 0, split_length), 20, true, true))
-          this.braids.push(weave_braid_along_line(get_lock_array(x + w, y + h/2 + split_length/4, x +split_length/4, y + split_length/4, x -  w/2,  y - h + split_length/4, 0, split_length), 20, false, true))
-        } else {
-          this.braids.push(weave_braid_along_line(get_lock_array(x , y + h , x , y , x+w + split_length/2, y - h, 0, split_length), 20, false))
-          this.braids.push(weave_braid_along_line(get_lock_array(x , y + h, x , y , x+w + split_length/2, y - h, 0, split_length), 20, true))
-          this.braids.push(weave_braid_along_line(get_lock_array(x , y + h, x , y , x+w + split_length/2, y -h, 0, split_length), 20, true, true))
-          this.braids.push(weave_braid_along_line(get_lock_array(x , y + h, x , y , x+w + split_length/2, y -h , 0, split_length), 20, false, true))
-        }
-  
-      }
-  
-      // RAYS
-      //steps = 1
-      rect_pts.forEach((point) => {
-        for (let i = 0; i <= steps; i++) {
-          let t = i / steps;
-        let x_s = curvePoint(point.x, point.x, x + w/2, x + w/2, t);
-        let y_s = curvePoint(point.y, point.y, y + h/2, y + h/2, t);
-        arr.push (new Point(x_s,y_s))
-        noStroke();
-        beginShape();
-        stroke('white');
-        circle(x_s, y_s, 5);
-        endShape()
-        }
-      })
-  
-    rect_pts = catmullRomFitting( arr, 1,  2)
-    hair_piece.push(this)
+    
+    rect_pts = catmullRomFitting( arr, 1,  cat_step)
     return rect_pts
   }
+
 }
 
 
@@ -538,25 +557,37 @@ var catmullRomFitting = function (data,alpha, steps) {
 };
 
 function animate_braids(){
-  let done = true
+  let done = true      
+
   rays.forEach((ray) => {
-    ray.draw_next()
-    if (ray.done = false) {
+    if (ray.done == false) {
+      ray.draw_next()
       done = false
     }
   });
-  setTimeout(animate_braids, 2);
+  if(~done){
+    setTimeout(animate_braids, .01);
+    setTimeout(animate_braids, .02);
+  }
+
 }
 
 function animate_splines() {
+
   let done = true
+  noStroke();
+  beginShape();
   rays.forEach((ray) => {
-    ray.draw_next()
+    ray.draw_next_simple()
     if (ray.done == false) {
       done = false
     }
   });
+  endShape()
   if(done) {
+    timeouts.forEach((timeout) => {
+      clearTimeout(timeout)
+    })
     rays = []
     splines = []
     let scale_factor = 10
@@ -565,20 +596,35 @@ function animate_splines() {
       piece.braids.forEach((braid)=> {
         if(piece.braid_type == "braid"){
           console.log("starting animate braids")
-          generate_iterations_from_spline(braid, 20, 100, false, 20, false, true, invert, piece.base_color, piece.highlight_color )
+          let scale_braid = 5 * M
+          switch(piece.size_txt ){
+            case "tiny":
+              scale_braid = 5 * M
+              break;
+            case "small":
+              scale_braid = 10* M 
+              break;
+            case "medium":
+              scale_braid = 20*M
+          }
+            
+          generate_iterations_from_spline(braid, 20, 50*M, false, 20, false, true, invert, piece.base_color, piece.highlight_color,scale_braid )
         } else if (piece.braid_type == "loc"){
           console.log("starting animate loc")
-          generate_iterations_from_spline(braid, 30, 200, false, 20, false, true, invert, piece.base_color, piece.highlight_color )
+          generate_iterations_from_spline(braid, 30, 200*M, false, 20, false, true, invert, piece.base_color, piece.highlight_color,scale_braid )
         }
 
         invert = !invert
         scale_factor += .5
+
       })
     })
 
     animate_braids()
   } else {
-    setTimeout(animate_splines, 2);
+    timeouts.push(setTimeout(animate_splines, .1));
+    timeouts.push(setTimeout(animate_splines, .1));
+
   }
 
 }
@@ -661,63 +707,141 @@ class Pallette {
     this.braid_1_ = braid_1
     this.braid_2_ = braid_2
   }
-
 }
 
+let pallettes = {
+  "fantasticfox" : new Pallette("#d47821","#d9cd07", "#3a9bbb", "#a30119" ),
+  //"grandbudapest" : new Pallette("#f94b55","#481212", "#cb5d28", "#ecad66" ),
+  //"moonrise1" : new Pallette("#8a863c", "#eda6ae", "#f6cf66","#75cbdc" ),
+  //"moonrise1a" : new Pallette("#edda5a","#c29e0c", "#cbcbc9", "#191f15" ),
+  //"royal1" : new Pallette("#788c93","#b92010", "#f8ecc6", "#d4712e" ),
+  //"moonrise2" : new Pallette("#677c75","#b3692c", "#c0ba7e", "#1f1a17" ),
+
+  // "cavalcanti" : new Pallette("#d47821","#d9cd07", "#3a9bbb", "#a30119" ),
+  // "royal2" : new Pallette("#d47821","#d9cd07", "#3a9bbb", "#a30119" ),
+  // "grandbudapest2" : new Pallette("#d47821","#d9cd07", "#3a9bbb", "#a30119" ),
+  // "moonrise3" : new Pallette("#d47821","#d9cd07", "#3a9bbb", "#a30119" ),
+  // "chevalier" : new Pallette("#d47821","#d9cd07", "#3a9bbb", "#a30119" ),
+  // "zissou" : new Pallette("#d47821","#d9cd07", "#3a9bbb", "#a30119" ),
+  // "darjeeling" : new Pallette("#d47821","#d9cd07", "#3a9bbb", "#a30119" )
+}
+
+function get_pallettes() {
+  var keys = [];
+  for (var key in pallettes) {
+    if (pallettes.hasOwnProperty(key)) {
+      keys.push(key);
+    }
+  }
+  return keys
+}
+
+let piece_data
+
+function renderPiece(){
+  splines = []
+  rays = []
+  hair_piece = []
+  print(piece_data["pallette"])
+  background(pallettes[piece_data["pallette"]].background_);
+  noFill();
+  window.addEventListener("resize", resizePiece);
+
+  let direction = null
+
+  let s = new ScalpFactory("box", piece_data["box_count"], 3, 'down', piece_data["sizes"],direction,  "braid", pallettes[piece_data["pallette"]].braid_2_ , pallettes[piece_data["pallette"]].braid_1_, pallettes[piece_data["pallette"]].braid_2_)
+  //new ScalpFactory("box", 14, 3, 'down', size, "braid", "#0d235f", "#b0cdcb", "#d56d6e")
+  //let s = new ScalpFactory("box", 1, 'down', "small", "loc", "#0d235f", "#b0cdcb", "torquoise")
+
+  animate_splines()
+  animate_splines()
+  animate_splines()
+  animate_splines()
+  animate_splines()
+  animate_splines()
+  animate_splines()
+  animate_splines()
+  animate_splines()
+  animate_splines()
+}
+
+function resizePiece(){
+  timeouts.forEach((timeout) => {
+    clearTimeout(timeout)
+  })
+  WIDTH = window.innerWidth;
+  HEIGHT = window.innerHeight ;
+  DIM = Math.min(WIDTH, HEIGHT);
+  M = DIM / DEFAULT_SIZE
+  print(DIM)
+  print(M)
+  resizeCanvas(DIM,  DIM, true)
+  renderPiece()
+}
+
+function calculateFeatures(tokenData) {
+  /**
+   * Implement me. This function should return a set of features in the format of key-value pair notation.
+   *
+   * For example, this should return `{"Palette": "Rosy", "Scale": "Big", "Tilt": 72}` if the desired features for a mint were:
+   * - Palette: Rosy
+   * - Scale: Big
+   * - Tilt: 72
+   */
+  let hash = tokenData.hash;
+  let box_number = R.random_int(10, 50)
+  let sizes = []
+  if(R.random_dec() < .1) {
+    box_number = 50
+    for(let i = 0; i < box_number; i++){
+      sizes.push("tiny")
+    }
+  } else {
+    for (let i = 0; i < box_number; i++){
+      let weighted_choice =  R.random_dec()
+      if(weighted_choice < 2/box_number){
+        sizes.push("medium")
+      } else if(weighted_choice < 1/4){
+        sizes.push("small")
+      } else {
+        sizes.push("tiny")
+      }
+  
+    }
+  }
+
+  let pallet_choice = get_pallettes()
+
+  
+
+  return {"box_count": box_number, "sizes": sizes, "pallette": R.random_choice(pallet_choice)}
+}
 
 function setup() {
 
-    createCanvas(width, height);
-    //background("hsl(57, 100%, 96%)");
-    //let p = new Pallette("#629076","#87761c", "#f1c2a6", "#fbd48f" )
-    //let p = new Pallette("#c5635a","#122253", "#122253", "#122253" )
-    // Fantastic Mr. Fox
-    let p = new Pallette("#d47821","#d9cd07", "#3a9bbb", "#a30119" )
-    background(p.background_);
-    noFill();
-    //drawRect(100, 100, width - 200, height - 200);
-    // middle
-    //generate_iterations_from_spline(get_rectangle_array(100,100,width/2 ,height - height/2 ), 16, 40, false, 80, false )
-    // // right
-    // //generate_iterations_from_spline(get_rectangle_array(100 + width/2 + 50,100,width/2 ,height - height/2 ), 16, 40, false, 60, false )
-    // // top middle
-    // generate_iterations_from_spline(get_rectangle_array(100,100 - (height - height/2) - 50,width/2 ,height - height/2 ), 16, 40, false, 60, false )
-    // // bottom middle
-    // generate_iterations_from_spline(get_rectangle_array(100,100 + (height - height/2) +50,width/2 ,height - height/2 ), 16, 40, false, 60, false )
-    // // left
-    // generate_iterations_from_spline(get_rectangle_array(100 - width/2 - 50,100,width/2 ,height - height/2 ), 16, 40, false, 60, false )
-    // let size = ["tiny", "tiny","tiny" , "tiny", "tiny","tiny", "tiny","tiny" , "tiny", "tiny","tiny", "tiny","tiny" , "tiny", "tiny","tiny", "tiny","tiny" , "tiny", "tiny","tiny", "tiny","tiny" , "tiny", "tiny","tiny", "tiny","tiny" , "tiny", "tiny","tiny", "tiny","tiny" , "tiny", "tiny","tiny", "tiny","tiny" , "tiny", "tiny",
-    // "tiny", "tiny","tiny" , "tiny", "tiny","tiny", "tiny","tiny" , "tiny", "tiny"]
 
-    let size = ["tiny", "medium","small" ,"tiny", "tiny","small" ,"tiny", "tiny" , "small", "tiny","tiny", "tiny" , "tiny", "tiny"]
-    let direction = ["upr", "upr", "dwnr", "dwnr", "upl", "dwnl", "upl", "dwnl", "upl", "dwnl", "upr", "upr", "dwnr", "dwnr", "upl", "dwnl", "upl", "dwnl", "upl", "dwnl","upr", "upr", "dwnr", "dwnr", "upl", "dwnl", "upl", "dwnl", "upl", "dwnl","upr", "upr", "dwnr", "dwnr", "upl", "dwnl", "upl", "dwnl", "upl", "dwnl"]
-
-    let s = new ScalpFactory("box", 10, 3, 'down', size,direction,  "braid", p.braid_2_ , p.braid_1_, p.braid_2_)
-    //new ScalpFactory("box", 14, 3, 'down', size, "braid", "#0d235f", "#b0cdcb", "#d56d6e")
-    //let s = new ScalpFactory("box", 1, 'down', "small", "loc", "#0d235f", "#b0cdcb", "torquoise")
-    animate_splines()
-
-    // rays = []
-    // splines = []
-
-    // draw_catmul_spline()
-
+    piece_data = calculateFeatures(tokenData)
+    print(tokenData)
+    print (piece_data)
+    createCanvas(DIM, DIM);
+    renderPiece()
+    filter(BLUR, 3);
 }
 
-function generate_iterations_from_spline(spline_array, iterations, randomness, taper=false,color_line=30,  highlight='hsl(180, 96%, 54%)',randomness_taper=false, invert = false, base_color="black", highlight_color="black" ) {
+function generate_iterations_from_spline(spline_array, iterations, randomness, taper=false,color_line=30,  highlight='hsl(180, 96%, 54%)',randomness_taper=false, invert = false, base_color="black", highlight_color="black", min_randomness_taper=10 ) {
   let iteration = []
   for (let k = 0; k < iterations ; k ++) {
     let spline = []
     for (let j = 0; j < spline_array.length; j ++) {
       if(spline.length){
         if(randomness_taper) {
-          spline.push(new Point(((Math.random()-.5)*Math.min(60,Math.max(2*randomness/(spline_array.length - j), 20)) + spline.slice(-1)[0].x + spline_array[j].x )/ 2, ((Math.random()-.5)*Math.min(40,Math.max(2*randomness/(spline_array.length - j), 20)) + spline.slice(-1)[0].y + spline_array[j].y )/ 2))
+          spline.push(new Point(((R.random_dec()-.5)*Math.min(300*M,Math.max(randomness/(spline_array.length - j), min_randomness_taper*M)) + spline.slice(-1)[0].x + spline_array[j].x )/ 2, ((R.random_dec()-.5)*Math.min(300*M,Math.max(randomness/(spline_array.length - j), min_randomness_taper*M)) + spline.slice(-1)[0].y + spline_array[j].y )/ 2))
         } else {
-          spline.push(new Point(((Math.random()-.5)*randomness + spline.slice(-1)[0].x + spline_array[j].x )/ 2, ((Math.random()-.5)*randomness + spline.slice(-1)[0].y + spline_array[j].y )/ 2))          
+          spline.push(new Point(((R.random_dec()-.5)*randomness + spline.slice(-1)[0].x + spline_array[j].x )/ 2, ((R.random_dec()-.5)*randomness + spline.slice(-1)[0].y + spline_array[j].y )/ 2))          
         }
 
       }else {
-        spline.push(new Point((Math.random()-.5)*20 + spline_array[j].x, spline_array[j].y))
+        spline.push(new Point((R.random_dec()-.5)*20 + spline_array[j].x, spline_array[j].y))
       }
 
     }
@@ -727,6 +851,8 @@ function generate_iterations_from_spline(spline_array, iterations, randomness, t
   
 
 }
+
+
 
 
 
