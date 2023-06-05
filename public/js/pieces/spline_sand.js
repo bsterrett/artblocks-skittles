@@ -271,7 +271,7 @@ class ScalpFactory {
 }
 
   find_place_to_place(current_x, current_size) {
-    let initial_y_offset = this.size_ref['tiny'] /2
+    let initial_y_offset = 0
     let y_offset = initial_y_offset
     let size_to_push_y = 0
     let collision = false
